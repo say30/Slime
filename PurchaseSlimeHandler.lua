@@ -325,10 +325,10 @@ PurchaseSlimeEvent.OnServerEvent:Connect(function(player, slimeData)
 		return
 	end
 
-	slimeClone.Parent = serverSlimesFolder
+        slimeClone.Parent = serverSlimesFolder
 
-	local startCF = CFrame.new(slimeData.position.X, slimeData.position.Y, slimeData.position.Z)
-	slimeClone:PivotTo(startCF)
+        local startCF = CFrame.new(slimeData.position.X, slimeData.position.Y, slimeData.position.Z)
+        slimeClone:PivotTo(startCF)
 
 	-- ⬇️ CRÉER LE BILLBOARD IDENTIQUE
 	createBillboard(slimeClone, slimeData.mood, slimeData.rarity, slimeData.size, slimeData.production, slimeData.cost)
@@ -350,13 +350,26 @@ PurchaseSlimeEvent.OnServerEvent:Connect(function(player, slimeData)
 		placedAt = os.time()
 	}
 
-	DataStoreManager.AddPod(player, podData)
-	print("[PurchaseSlime] 💾 Pod sauvegardé:", baseName, "Pod", podNumber)
+        DataStoreManager.AddPod(player, podData)
+        print("[PurchaseSlime] 💾 Pod sauvegardé:", baseName, "Pod", podNumber)
 
-	local homeStructure = base:FindFirstChild("structure base home", true)
-	if not homeStructure then
-		warn("[PurchaseSlime] ❌ Structure home introuvable")
-		slimeClone:Destroy()
+        -- 🚀 Mettre à jour les contrats (achats & pods occupés)
+        if _G.UpdateContractProgress then
+                _G.UpdateContractProgress(player, "BuySlime", {
+                        count = 1,
+                        rarity = slimeData.rarity,
+                        size = slimeData.size
+                })
+
+                _G.UpdateContractProgress(player, "PodsSlimes", {
+                        count = #serverSlimesFolder:GetChildren()
+                })
+        end
+
+        local homeStructure = base:FindFirstChild("structure base home", true)
+        if not homeStructure then
+                warn("[PurchaseSlime] ❌ Structure home introuvable")
+                slimeClone:Destroy()
 		DataStoreManager.AddGelatine(player, slimeData.cost)
 		return
 	end

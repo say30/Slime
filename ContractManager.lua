@@ -21,6 +21,69 @@ local UpdateContractProgressEvent = RemoteEvents:WaitForChild("UpdateContractPro
 print("[ContractManager] ✅ Service initialisé")
 
 -- ============================================
+-- 🔁 MISE À JOUR DE LA PROGRESSION
+-- ============================================
+
+local function updateContractProgress(player, eventType, data)
+local activeContracts = DataStoreManager.GetActiveContracts(player)
+if not activeContracts or #activeContracts == 0 then return end
+
+local payload = data or {}
+
+for _, contractId in ipairs(activeContracts) do
+local contractConfig = ContractConfig:GetContractById(contractId.id or contractId)
+if contractConfig then
+local objective = contractConfig.objective or {}
+local newProgress
+
+if contractConfig.type == "BuySlimes" and eventType == "BuySlime" then
+newProgress = DataStoreManager.IncrementContractProgress(player, contractConfig.id, payload.count or 1)
+elseif contractConfig.type == "BuyRarity" and eventType == "BuySlime" then
+if payload.rarity == objective.target then
+newProgress = DataStoreManager.IncrementContractProgress(player, contractConfig.id, 1)
+end
+elseif contractConfig.type == "BuySize" and eventType == "BuySlime" then
+if payload.size == objective.target then
+newProgress = DataStoreManager.IncrementContractProgress(player, contractConfig.id, 1)
+end
+elseif contractConfig.type == "CollectGelatin" and eventType == "CollectGelatin" then
+if payload.amount and payload.amount > 0 then
+local current = DataStoreManager.GetContractProgress(player, contractConfig.id)
+newProgress = current + payload.amount
+DataStoreManager.UpdateContractProgress(player, contractConfig.id, newProgress)
+end
+elseif contractConfig.type == "SellSlimes" and eventType == "SellSlime" then
+newProgress = DataStoreManager.IncrementContractProgress(player, contractConfig.id, payload.count or 1)
+elseif contractConfig.type == "SellValue" and eventType == "SellValue" then
+if payload.value and payload.value > 0 then
+local current = DataStoreManager.GetContractProgress(player, contractConfig.id)
+newProgress = current + payload.value
+DataStoreManager.UpdateContractProgress(player, contractConfig.id, newProgress)
+end
+elseif contractConfig.type == "PodsSlimes" and eventType == "PodsSlimes" then
+if payload.count then
+local current = DataStoreManager.GetContractProgress(player, contractConfig.id)
+if payload.count > current then
+newProgress = payload.count
+DataStoreManager.UpdateContractProgress(player, contractConfig.id, payload.count)
+end
+end
+elseif contractConfig.type == "FuseState" and eventType == "FuseState" then
+if payload.state and payload.state == objective.target then
+newProgress = 1
+DataStoreManager.UpdateContractProgress(player, contractConfig.id, 1)
+end
+end
+
+-- Informer le client pour rafraîchir son UI
+if newProgress then
+UpdateContractProgressEvent:FireClient(player, contractConfig.id, newProgress)
+end
+end
+end
+end
+
+-- ============================================
 -- 🎲 SÉLECTION DES CONTRATS QUOTIDIENS
 -- ============================================
 
@@ -93,7 +156,7 @@ local function calculateTarget(player)
 end
 
 local function calculateRewards(player, contractData)
-	local target = calculateTarget(player)
+local target = calculateTarget(player)
 
 	local gelatin = math.floor(target * contractData.rewards.gelatinPercent)
 	local essence = math.floor(target * contractData.rewards.essencePercent)
@@ -103,6 +166,35 @@ local function calculateRewards(player, contractData)
 		essence = essence,
 		catalysts = contractData.rewards.catalysts or {}
 	}
+end
+
+-- Préparer et envoyer les contrats au client
+local function sendContractsToClient(player)
+local activeContracts = DataStoreManager.GetActiveContracts(player)
+
+-- Préparer les données avec progression et récompenses
+local contractsData = {}
+
+for _, contractId in ipairs(activeContracts) do
+local contractConfig = ContractConfig:GetContractById(contractId.id or contractId)
+
+if contractConfig then
+local progress = DataStoreManager.GetContractProgress(player, contractConfig.id)
+local rewards = calculateRewards(player, contractConfig)
+
+table.insert(contractsData, {
+id = contractConfig.id,
+tier = contractConfig.tier,
+type = contractConfig.type,
+objective = contractConfig.objective,
+progress = progress,
+rewards = rewards
+})
+end
+end
+
+RequestContractsEvent:FireClient(player, contractsData)
+print("[ContractManager] 📤 Contrats envoyés à", player.Name, "-", #contractsData, "contrats")
 end
 
 -- ============================================
@@ -144,31 +236,7 @@ end
 -- ============================================
 
 RequestContractsEvent.OnServerEvent:Connect(function(player)
-	local activeContracts = DataStoreManager.GetActiveContracts(player)
-
-	-- Préparer les données avec progression et récompenses
-	local contractsData = {}
-
-	for _, contractId in ipairs(activeContracts) do
-		local contractConfig = ContractConfig:GetContractById(contractId.id or contractId)
-
-		if contractConfig then
-			local progress = DataStoreManager.GetContractProgress(player, contractConfig.id)
-			local rewards = calculateRewards(player, contractConfig)
-
-			table.insert(contractsData, {
-				id = contractConfig.id,
-				tier = contractConfig.tier,
-				type = contractConfig.type,
-				objective = contractConfig.objective,
-				progress = progress,
-				rewards = rewards
-			})
-		end
-	end
-
-	RequestContractsEvent:FireClient(player, contractsData)
-	print("[ContractManager] 📤 Contrats envoyés à", player.Name, "-", #contractsData, "contrats")
+sendContractsToClient(player)
 end)
 
 -- ============================================
@@ -256,8 +324,8 @@ ClaimContractRewardEvent.OnServerEvent:Connect(function(player, contractId)
 
 	print("[ContractManager] ✅ Récompenses données à", player.Name)
 
-	-- Renvoyer les contrats mis à jour
-	RequestContractsEvent:FireServer()
+-- Renvoyer les contrats mis à jour
+sendContractsToClient(player)
 end)
 
 -- ============================================
@@ -265,7 +333,7 @@ end)
 -- ============================================
 
 Players.PlayerAdded:Connect(function(player)
-	initializePlayerContracts(player)
+        initializePlayerContracts(player)
 end)
 
 -- Pour les joueurs déjà connectés
@@ -274,5 +342,8 @@ for _, player in ipairs(Players:GetPlayers()) do
 		initializePlayerContracts(player)
 	end)
 end
+
+-- Rendre accessible aux autres services
+_G.UpdateContractProgress = updateContractProgress
 
 print("[ContractManager] ✅ Service chargé")
