@@ -48,13 +48,20 @@ local function hookHitbox(base, baseNumber)
 		local accumulated = DataStoreManager.GetAccumulatedGelatin(player)
 		if accumulated <= 0 then return end -- ← CLEF DU SYSTÈME !
 
-		local amount = math.floor(accumulated)
+                local amount = math.floor(accumulated)
 
-		-- Ajouter au wallet
-		DataStoreManager.AddGelatine(player, amount)
+                -- Ajouter au wallet
+                DataStoreManager.AddGelatine(player, amount)
 
-		-- ✅ RESET À 0 (empêche le spam automatiquement)
-		DataStoreManager.SetAccumulatedGelatin(player, 0)
+                -- Mettre à jour les contrats de collecte
+                if _G.UpdateContractProgress then
+                        _G.UpdateContractProgress(player, "CollectGelatin", {
+                                amount = amount
+                        })
+                end
+
+                -- ✅ RESET À 0 (empêche le spam automatiquement)
+                DataStoreManager.SetAccumulatedGelatin(player, 0)
 
 		-- Mettre à jour le temps
 		DataStoreManager.UpdateLastCollectionTime(player)
