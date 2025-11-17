@@ -17,6 +17,7 @@ local FormatNumbers = require(ReplicatedStorage.Modules.Shared.FormatNumbers)
 local RemoteEvents = ReplicatedStorage:WaitForChild("RemoteEvents")
 local RequestContractsEvent = RemoteEvents:WaitForChild("RequestContractsEvent")
 local ClaimContractRewardEvent = RemoteEvents:WaitForChild("ClaimContractRewardEvent")
+local UpdateContractProgressEvent = RemoteEvents:WaitForChild("UpdateContractProgressEvent")
 
 -- ============================================
 -- 📐 CONSTANTES
@@ -371,9 +372,20 @@ end
 
 -- Recevoir les contrats du serveur
 RequestContractsEvent.OnClientEvent:Connect(function(contracts)
-	contractsData = contracts
-	refreshContracts()
-	updateProgress()
+contractsData = contracts
+refreshContracts()
+updateProgress()
+end)
+
+-- Mise à jour en temps réel de la progression
+UpdateContractProgressEvent.OnClientEvent:Connect(function(contractId, progress)
+for _, contract in ipairs(contractsData) do
+if contract.id == contractId then
+contract.progress = progress
+end
+end
+
+updateProgress()
 end)
 
 -- Ouvrir/Fermer l'interface

@@ -660,11 +660,12 @@ end
 
 -- Incrémenter la progression d'un contrat
 function DataStoreManager.IncrementContractProgress(player, contractId, amount)
-	if not playerData[player.UserId] then return false end
-	local current = playerData[player.UserId].contracts.progress[contractId] or 0
-	playerData[player.UserId].contracts.progress[contractId] = current + (amount or 1)
-	print("[DataStore] ➕ Progression contrat", contractId, ":", current, "→", current + (amount or 1))
-	return true
+if not playerData[player.UserId] then return false end
+local current = playerData[player.UserId].contracts.progress[contractId] or 0
+local newValue = current + (amount or 1)
+playerData[player.UserId].contracts.progress[contractId] = newValue
+print("[DataStore] ➕ Progression contrat", contractId, ":", current, "→", newValue)
+return newValue
 end
 
 -- Réinitialiser un contrat (après claim)
